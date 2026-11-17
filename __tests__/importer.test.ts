@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { buildWorkbook, toExcelSerial } from '@/lib/exporter';
+import { strFromU8, unzipSync } from 'fflate';
+import { buildWorkbook, buildXlsx, freezeHeaderRow, toExcelSerial } from '@/lib/exporter';
 import {
   MAX_IMPORT_ROWS,
   parseCompleted,
@@ -278,8 +279,8 @@ describe('export → import round trip', () => {
   ];
 
   it('imports an exported file back unchanged, with no warnings', () => {
-    const bytes = XLSX.write(buildWorkbook(todos), { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
-    const result = readImportFile(bytes, 'todos-2026-11-19.xlsx');
+    const bytes = buildXlsx(todos);
+    const result = readImportFile(bytes.slice().buffer as ArrayBuffer, 'todos-2026-11-19.xlsx');
     expect(result.skipped).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.rows).toEqual(
@@ -291,5 +292,21 @@ describe('export → import round trip', () => {
     const sheet = buildWorkbook(todos).Sheets.Tasks;
     expect(sheet.C2).toMatchObject({ t: 'n', v: toExcelSerial('2026-11-25'), z: 'yyyy-mm-dd' });
     expect(toExcelSerial('2026-11-20')).toBe(46346);
+  });
+
+  it('freezes the header row', () => {
+    const xml = strFromU8(unzipSync(buildXlsx(todos))['xl/worksheets/sheet1.xml']);
+    expect(xml).toContain('<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>');
+    // Exactly one sheetView, and the cell data is untouched.
+    expect(xml.match(/<sheetView[ >]/g)).toHaveLength(1);
+    expect(xml).toContain('Write report, with commas');
+  });
+
+  it('leaves a file unchanged if the sheet view is not the expected one', () => {
+    const bytes = new Uint8Array(xlsxBytes([['description'], ['Task']], (ws) => {
+      ws['!cols'] = [{ wch: 10 }];
+    }));
+    const frozen = freezeHeaderRow(bytes);
+    expect(freezeHeaderRow(frozen)).toBe(frozen); // already frozen → returned as is
   });
 });

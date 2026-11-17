@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { Todo } from '@/types/todo';
 
 /**
@@ -49,8 +50,8 @@ export function buildWorkbook(todos: Todo[]): XLSX.WorkBook {
     { wch: 17 },
     { wch: 17 },
   ];
-  // Freezing the header row isn't possible here: the SheetJS Community Edition
-  // doesn't write frozen panes.
+  // The header row is frozen after writing (see freezeHeaderRow): the SheetJS
+  // Community Edition doesn't write frozen panes itself.
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, SHEET_NAME);
@@ -61,7 +62,47 @@ export function exportFileName(date: Date = new Date()): string {
   return `todos-${dayjs(date).format('YYYY-MM-DD')}.xlsx`;
 }
 
-/** Build the workbook and trigger a browser download. */
+const SHEET_XML = 'xl/worksheets/sheet1.xml';
+const PLAIN_VIEW = '<sheetView workbookViewId="0"/>';
+const FROZEN_VIEW =
+  '<sheetView workbookViewId="0">' +
+  '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
+  '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>' +
+  '</sheetView>';
+
+/**
+ * Freeze the first row of the first sheet in an .xlsx file by patching its
+ * <sheetView> element. If SheetJS ever writes a different view, the file is
+ * returned unchanged: an unfrozen header beats a broken file.
+ */
+export function freezeHeaderRow(xlsx: Uint8Array): Uint8Array {
+  const files = unzipSync(xlsx);
+  const sheet = files[SHEET_XML];
+  if (!sheet) return xlsx;
+  const xml = strFromU8(sheet);
+  if (!xml.includes(PLAIN_VIEW)) return xlsx;
+  files[SHEET_XML] = strToU8(xml.replace(PLAIN_VIEW, FROZEN_VIEW));
+  return zipSync(files, { level: 6 });
+}
+
+/** The finished .xlsx bytes: workbook plus frozen header row. */
+export function buildXlsx(todos: Todo[]): Uint8Array {
+  const bytes = XLSX.write(buildWorkbook(todos), { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  return freezeHeaderRow(new Uint8Array(bytes));
+}
+
+/** Build the file and trigger a browser download. */
 export function downloadTodos(todos: Todo[], fileName = exportFileName()): void {
-  XLSX.writeFile(buildWorkbook(todos), fileName, { compression: true });
+  const blob = new Blob([buildXlsx(todos) as Uint8Array<ArrayBuffer>], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoke on the next tick so the download has started.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
