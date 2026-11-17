@@ -31,7 +31,7 @@ export default function TodoList() {
 
   const emptyText =
     todos.length === 0
-      ? 'No tasks yet. Add one above.'
+      ? 'No tasks yet. Add one above or import a CSV.'
       : 'No tasks match your search or filter.';
 
   return (

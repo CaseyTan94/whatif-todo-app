@@ -1,8 +1,10 @@
 'use client';
 
-import { Card, Divider, Skeleton, Typography } from 'antd';
+import { Card, Divider, Flex, Skeleton, Typography } from 'antd';
 import AddTodo from '@/components/AddTodo';
+import ExportButton from '@/components/ExportButton';
 import Filters from '@/components/Filters';
+import ImportTodos from '@/components/ImportTodos';
 import TodoList from '@/components/TodoList';
 import { TodosProvider, useTodos } from '@/hooks/useTodos';
 
@@ -14,6 +16,10 @@ function TodoApp() {
 
   return (
     <>
+      <Flex justify="flex-end" gap={8} wrap style={{ marginBottom: 16 }}>
+        <ImportTodos />
+        <ExportButton />
+      </Flex>
       <AddTodo />
       <Divider style={{ margin: '16px 0' }} />
       <Filters />

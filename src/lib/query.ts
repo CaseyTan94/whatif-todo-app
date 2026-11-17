@@ -88,11 +88,18 @@ export function paginate(items: Todo[], page: number, pageSize: number): TodoVie
   };
 }
 
-export function runQuery(todos: Todo[], query: TodoQuery): TodoView {
+/** search → status → sort, without paging. Also used for "Export current view". */
+export function applyFilters(
+  todos: Todo[],
+  query: Pick<TodoQuery, 'search' | 'status' | 'sortDir'>,
+): Todo[] {
   const searched = searchTodos(todos, query.search);
   const filtered = filterByStatus(searched, query.status);
-  const sorted = sortTodos(filtered, query.sortDir);
-  return paginate(sorted, query.page, query.pageSize);
+  return sortTodos(filtered, query.sortDir);
+}
+
+export function runQuery(todos: Todo[], query: TodoQuery): TodoView {
+  return paginate(applyFilters(todos, query), query.page, query.pageSize);
 }
 
 /**

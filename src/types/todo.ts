@@ -27,3 +27,8 @@ export interface NewTodoInput {
   category: Category;
   dueDate: string | null;
 }
+
+/** A validated row from a CSV/Excel import: user fields plus completion status. */
+export interface ImportedTodo extends NewTodoInput {
+  completed: boolean;
+}

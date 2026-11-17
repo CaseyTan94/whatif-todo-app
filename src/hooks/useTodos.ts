@@ -11,15 +11,16 @@ import {
   type ReactNode,
 } from 'react';
 import { App } from 'antd';
-import type { NewTodoInput, PersistedState, Todo } from '@/types/todo';
-import { emptyState, load, save } from '@/lib/storage';
+import type { ImportedTodo, NewTodoInput, PersistedState, Todo } from '@/types/todo';
+import { emptyState, load, save, subscribe } from '@/lib/storage';
 import { validateTodoInput } from '@/lib/validation';
-import { DEFAULT_QUERY, PAGE_SIZES, runQuery, updateQuery, type TodoQuery } from '@/lib/query';
+import { DEFAULT_QUERY, runQuery, updateQuery, type TodoQuery } from '@/lib/query';
 
-// IMPORT and REORDER land Thu/Fri.
+// REORDER lands Fri.
 type Action =
-  | { type: 'HYDRATE'; state: PersistedState }
+  | { type: 'HYDRATE'; state: PersistedState } // initial load, and re-load when another tab saves
   | { type: 'ADD'; todo: Todo }
+  | { type: 'IMPORT'; todos: Todo[] }
   | { type: 'UPDATE'; id: string; changes: NewTodoInput; now: string }
   | { type: 'DELETE'; id: string }
   | { type: 'TOGGLE'; id: string; now: string }
@@ -37,15 +38,16 @@ function mapTodos(state: State, fn: (todos: Todo[]) => Todo[]): State {
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'HYDRATE': {
-      const saved = action.state.prefs.pageSize;
-      const pageSize = PAGE_SIZES.includes(saved) ? saved : DEFAULT_QUERY.pageSize;
+    case 'HYDRATE':
+      // storage.load() has already validated prefs. Keep the current search,
+      // filter and sort so a sync from another tab doesn't reset them.
       return {
-        data: { ...action.state, prefs: { ...action.state.prefs, pageSize } },
-        query: { ...state.query, pageSize },
+        data: action.state,
+        query: { ...state.query, pageSize: action.state.prefs.pageSize },
         hydrated: true,
       };
-    }
+    case 'IMPORT':
+      return mapTodos(state, (todos) => [...todos, ...action.todos]);
     case 'SET_QUERY': {
       const query = updateQuery(state.query, action.patch);
       if (query.pageSize === state.data.prefs.pageSize) return { ...state, query };
@@ -101,8 +103,21 @@ function useTodosState() {
   // 1. Load once on the client. localStorage doesn't exist on the server, so
   //    this must run in an effect, never during render.
   useEffect(() => {
-    dispatch({ type: 'HYDRATE', state: load() });
-  }, []);
+    const { state: loaded, recovered } = load();
+    dispatch({ type: 'HYDRATE', state: loaded });
+    if (recovered) {
+      notification.warning({
+        key: 'storage-recovered',
+        title: 'Some saved data could not be read',
+        description: recovered.backupKey
+          ? `Your saved tasks were unreadable, so the list was reset. The original data was kept in localStorage under "${recovered.backupKey}".`
+          : `${recovered.dropped} invalid task(s) were skipped.`,
+        duration: 0,
+      });
+    }
+    // Keep tabs in sync: when another tab saves, re-load from storage.
+    return subscribe(() => dispatch({ type: 'HYDRATE', state: load().state }));
+  }, [notification]);
 
   // 2. Save on every change, but ONLY after hydration. Saving before load would
   //    overwrite the user's stored tasks with the initial empty list.
@@ -157,6 +172,28 @@ function useTodosState() {
     [],
   );
 
+  /**
+   * Append imported rows after the existing tasks. Every row gets a fresh id and
+   * continuing `order` values. Rows are expected to be validated already
+   * (lib/importer.ts); anything still invalid is skipped. Returns the count added.
+   */
+  const importTodos = useCallback(
+    (rows: ImportedTodo[]): number => {
+      const now = new Date().toISOString();
+      let order = todos.reduce((max, t) => Math.max(max, t.order), -1);
+      const added: Todo[] = [];
+      for (const row of rows) {
+        const clean = normalize(row);
+        if (validateTodoInput(clean)) continue;
+        order += 1;
+        added.push({ id: newId(), ...clean, completed: row.completed, order, createdAt: now, updatedAt: now });
+      }
+      if (added.length > 0) dispatch({ type: 'IMPORT', todos: added });
+      return added.length;
+    },
+    [todos],
+  );
+
   const { query } = state;
   const view = useMemo(() => runQuery(todos, query), [todos, query]);
 
@@ -185,8 +222,9 @@ function useTodosState() {
       updateTodo,
       deleteTodo,
       toggleTodo,
+      importTodos,
     }),
-    [todos, view, query, setQuery, state.data.prefs, state.hydrated, addTodo, updateTodo, deleteTodo, toggleTodo],
+    [todos, view, query, setQuery, state.data.prefs, state.hydrated, addTodo, updateTodo, deleteTodo, toggleTodo, importTodos],
   );
 }
 
