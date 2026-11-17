@@ -113,6 +113,8 @@ export interface LoadResult {
   state: PersistedState;
   /** Set when stored data had problems, so the UI can tell the user. */
   recovered?: { dropped: number; backupKey?: string };
+  /** True when nothing has ever been saved in this browser (first visit). */
+  firstRun?: boolean;
 }
 
 /** Copy unreadable data aside before it gets overwritten, so nothing is silently lost. */
@@ -135,7 +137,7 @@ export function load(): LoadResult {
     console.warn('[storage] localStorage is unavailable.', err);
     return { state: emptyState() };
   }
-  if (text === null) return { state: emptyState() };
+  if (text === null) return { state: emptyState(), firstRun: true };
 
   let result: MigrateResult | null = null;
   try {

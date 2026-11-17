@@ -8,3 +8,65 @@ body {
   min-height: 100%;
   background: #f5f5f5;
 }
+
+/* antd hides the page-size changer below 576px wide; the brief requires it on
+   every screen, so keep it visible (it wraps under the page numbers if needed). */
+.todo-pagination.ant-pagination .ant-pagination-options {
+  display: inline-block;
+}
+
+/* ---- Calendar task chips (components/Calendar.tsx) ---- */
+.calendar-task,
+.calendar-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.calendar-task:hover,
+.calendar-more:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.calendar-task:focus-visible,
+.calendar-more:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: -2px;
+}
+.calendar-task-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.calendar-task[data-completed] {
+  opacity: 0.5;
+}
+.calendar-task[data-completed] .calendar-task-text {
+  text-decoration: line-through;
+}
+.calendar-more {
+  color: rgba(0, 0, 0, 0.45);
+}
+/* Compact (mobile) calendar: one dot under each day that has tasks. */
+.calendar-mini-dot {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: #1677ff;
+}

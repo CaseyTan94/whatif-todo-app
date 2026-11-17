@@ -121,3 +121,22 @@ export function updateQuery(prev: TodoQuery, patch: Partial<TodoQuery>): TodoQue
 export function isFiltering(query: Pick<TodoQuery, 'search' | 'status'>): boolean {
   return normalizeText(query.search) !== '' || query.status !== 'all';
 }
+
+/**
+ * Calendar lookup: due date ('YYYY-MM-DD') → tasks due that day, incomplete
+ * first, then in manual order. Built once per change so each calendar cell is
+ * a map lookup rather than a scan of the whole list. Undated tasks are left out.
+ */
+export function groupByDueDate(todos: Todo[]): Map<string, Todo[]> {
+  const groups = new Map<string, Todo[]>();
+  for (const todo of todos) {
+    if (!todo.dueDate) continue;
+    const list = groups.get(todo.dueDate);
+    if (list) list.push(todo);
+    else groups.set(todo.dueDate, [todo]);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => Number(a.completed) - Number(b.completed) || a.order - b.order);
+  }
+  return groups;
+}

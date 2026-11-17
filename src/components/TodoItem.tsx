@@ -1,8 +1,9 @@
 'use client';
 
 import dayjs from 'dayjs';
-import { CalendarOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
-import { App, Badge, Button, Checkbox, Flex, List, Popconfirm, Tag, Tooltip, Typography } from 'antd';
+import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
+import { CalendarOutlined, DeleteOutlined, EditOutlined, HolderOutlined } from '@ant-design/icons';
+import { App, Badge, Button, Checkbox, Flex, Popconfirm, Tag, Tooltip, Typography, theme } from 'antd';
 import { useTodos } from '@/hooks/useTodos';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import { DATE_FORMAT, isOverdue } from '@/lib/validation';
@@ -12,11 +13,15 @@ interface TodoItemProps {
   todo: Todo;
   today: string; // YYYY-MM-DD, passed in so every row agrees on "today"
   onEdit: (todo: Todo) => void;
+  /** Present only in manual order: renders the drag handle (mouse, touch and keyboard). */
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }
 
-function TodoItem({ todo, today, onEdit }: TodoItemProps) {
+/** One task row. The list wraps it in an <li> that drag-and-drop controls. */
+function TodoItem({ todo, today, onEdit, dragHandleProps }: TodoItemProps) {
   const { toggleTodo, deleteTodo } = useTodos();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const overdue = isOverdue(todo.dueDate, todo.completed, today);
 
   function handleDelete() {
@@ -25,26 +30,18 @@ function TodoItem({ todo, today, onEdit }: TodoItemProps) {
   }
 
   return (
-    <List.Item
-      actions={[
-        <Tooltip title="Edit" key="edit">
-          <Button type="text" icon={<EditOutlined />} aria-label="Edit task" onClick={() => onEdit(todo)} />
-        </Tooltip>,
-        <Popconfirm
-          key="delete"
-          title="Delete this task?"
-          description="This can't be undone."
-          okText="Delete"
-          okButtonProps={{ danger: true }}
-          cancelText="Cancel"
-          onConfirm={handleDelete}
+    <Flex align="center" gap={12} style={{ padding: '12px 4px' }}>
+      {dragHandleProps && (
+        <span
+          {...dragHandleProps}
+          // Space lifts the row, arrow keys move it, Space drops, Escape cancels.
+          aria-label={`Reorder "${todo.description}"`}
+          style={{ cursor: 'grab', color: token.colorTextTertiary, padding: '4px 0', display: 'flex' }}
         >
-          <Tooltip title="Delete">
-            <Button type="text" danger icon={<DeleteOutlined />} aria-label="Delete task" />
-          </Tooltip>
-        </Popconfirm>,
-      ]}
-    >
+          <HolderOutlined />
+        </span>
+      )}
+
       <Flex gap={12} align="center" wrap style={{ flex: 1, minWidth: 0 }}>
         <Checkbox
           checked={todo.completed}
@@ -70,7 +67,25 @@ function TodoItem({ todo, today, onEdit }: TodoItemProps) {
           </Flex>
         )}
       </Flex>
-    </List.Item>
+
+      <Flex gap={4}>
+        <Tooltip title="Edit">
+          <Button type="text" icon={<EditOutlined />} aria-label="Edit task" onClick={() => onEdit(todo)} />
+        </Tooltip>
+        <Popconfirm
+          title="Delete this task?"
+          description="This can't be undone."
+          okText="Delete"
+          okButtonProps={{ danger: true }}
+          cancelText="Cancel"
+          onConfirm={handleDelete}
+        >
+          <Tooltip title="Delete">
+            <Button type="text" danger icon={<DeleteOutlined />} aria-label="Delete task" />
+          </Tooltip>
+        </Popconfirm>
+      </Flex>
+    </Flex>
   );
 }
 
