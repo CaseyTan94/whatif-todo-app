@@ -2,6 +2,7 @@
 
 import { Card, Divider, Skeleton, Typography } from 'antd';
 import AddTodo from '@/components/AddTodo';
+import Filters from '@/components/Filters';
 import TodoList from '@/components/TodoList';
 import { TodosProvider, useTodos } from '@/hooks/useTodos';
 
@@ -14,7 +15,8 @@ function TodoApp() {
   return (
     <>
       <AddTodo />
-      <Divider style={{ margin: '16px 0 0' }} />
+      <Divider style={{ margin: '16px 0' }} />
+      <Filters />
       <TodoList />
     </>
   );
